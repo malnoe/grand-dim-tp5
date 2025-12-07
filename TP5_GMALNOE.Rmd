@@ -1,0 +1,243 @@
+---
+title: "TP5 noté individuel"
+author: "Garance Malnoë"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+Librairies
+```{r,message=FALSE,echo=FALSE,warning=FALSE}
+# Modèles
+library(glmnet)
+# Selective Inference
+library(selectiveInference)
+# Visualisations
+library(ggplot2)
+library(ggpubr)
+library(GGally)
+# Gestion des données
+library(dplyr)
+library(tidyr)
+```
+
+# Préparation des données
+
+Importation du jeu de données
+```{r}
+day <- read.csv("~/Ecole/M2/S1/Stat grande dimension/Partie 2 - Modèles pénalisés/day.csv") 
+# A modifier avec votre path
+```
+
+Vérifiez les dimensions des données et assurez-vous qu’elles sont cohérentes avec le modèle.
+```{r}
+View(day)
+```
+Il est nécessaire d'enlever les variables "instant","dteday" car il s'agit de l'instance et de la date. On supprime également les colonnes "casual" et "registered" car leur somme donne la variable que l'on souhaite prédire "cnt".
+```{r}
+day <- day[,-c(1,2,14,15)]
+```
+
+Les modèles de régression de Poisson sont utilisés lorsque l'on souhaite modéliser des variables de comptage. La variable d'intérêt dans ce jeu de données, "cnt", compte le nombre d'emprunt de vélos réalisés dans une journée, le modèle de régression de Poisson est adapté.
+
+Vérifions les données manquantes
+```{r}
+sum(is.na(day))
+```
+Il n'y en a pas.
+
+```{r}
+dim(day)
+```
+Le jeu de donénes est composé de 731 observations de 11 variables explicatives et de la variable "cnt" à expliquer.
+
+Vérifions la présence de données aberrantes :
+```{r}
+summary(day)
+```
+Il ne semble pas y en avoir, les minimums et maximum font sens.
+
+Nous séparons le jeu de données day en : y, les données à expliquer, et X les variables explicatives.
+```{r}
+y <- day[,12]
+X <- day[,-12]
+
+X <- as.matrix(X) # Transformation en matrice nécessaire pour glmnet.
+```
+
+
+# Estimation et stabilité de l’estimateur
+
+Modèle de regression de Poisson avec régularisation Lasso
+```{r}
+# On fait une cross-validation pour choisir le paramètre lambda le + adapté
+set.seed(1) # Reproductibilité
+lasso_cv <- cv.glmnet(
+  X, y,
+  alpha = 1, # lasso donc alpha=1
+  nfolds=10, # K = 10 folds
+  family="poisson" # Pour avoir une modèle de poisson
+)
+lambda.min <- lasso_cv$lambda.min
+lambda.1se <- lasso_cv$lambda.1se
+
+# On récupère le modèle correspondant
+lasso.min <- glmnet(X, y, alpha = 1, lambda = lambda.min, family="poisson")
+lasso.1se <- glmnet(X, y, alpha = 1, lambda = lambda.1se, family="poisson")
+```
+
+```{r}
+lambda.min
+lambda.1se
+```
+Le lambda.min obtenu par la cross-validation est de 20.3787 et le lambda.1se est de 119.3585.
+
+
+Stabilité de la sélection des variables
+
+```{r}
+set.seed(1) # Reproductibilité
+
+# Noms des variables explicatives, pour les vecteurs de résultat
+vars <- colnames(day)[colnames(day) != "cnt"] 
+
+# Nombre de répétition pour le bootstrap, à prendre suffisamment grand.
+n_rep <- 1000 
+
+p <- length(vars)
+n <- nrow(day)
+
+# Fonction pour récupérer les variables sélectionnées
+get_support <- function(model) {
+  as.matrix(coef(model))[-1, , drop = FALSE] != 0  # enlève intercept
+}
+
+# Initialisation des vecteurs / matrices de résultats
+path_lasso   <- array(0, dim = c(p, n_rep), dimnames = list(vars, NULL))
+
+for (r in 1:n_rep) {
+  # Ré-échantillonage
+  set.seed(100 + r)
+  idx <- sample(1:n,size=n,replace=TRUE)
+  new_day <- day[idx, ]
+  new_y <- new_day[,12]
+  new_X <- new_day[,-12]
+  new_X <- as.matrix(new_X) # Transformation en matrice nécessaire pour glmnet.
+  
+  # Lasso
+  ## fit pour chaque lambda
+  lasso_fit <- glmnet(new_X, new_y, alpha = 1, family="poisson", lambda = lambda.1se)
+  ## variables sélectionnées pour chaque fit
+  path_lasso[, r] <- get_support(lasso_fit)
+}
+
+# On compte pour chaque variable pour chaque 
+#le nombre moyen de fois où elle est incluse
+stab_lasso <- apply(path_lasso, c(1), mean)
+```
+
+```{r}
+stab_lasso
+```
+Pour ce lambda = lambda.1se, 
+- certaines variables sont instables (en se fixant un seuil à 5% d'écart à 0 ou 1) : holiday, weekday, workingday, temp, hum et windspeed. Ces variables sont parfois sélectionnées mais pas toujours.
+- certaines variables sont stables : season, yr, weathersit et atemp. Soit elles sont toujours sélectionnées (valeur proche de 1), soit elles ne sont jamais sélectionnées (valeur proche de 0).
+
+Nous pouvons également regarder ce qu'il se passe pour l'ensemble des lambda :
+```{r}
+set.seed(1) # Reproductibilité
+
+vars <- colnames(day)[colnames(day) != "cnt"] # Noms des variables explicatives.
+
+n_rep <- 100 # Nombre de répétition pour le bootstrap, 
+#à prendre suffisamment grand.
+
+# On définit une grille de lambda commune à toutes les répétitions, 
+# à prendre suffisament fine.
+lambda_grid <- seq(1, 300, by=0.25)
+
+p <- length(vars)
+L <- length(lambda_grid)
+n <- nrow(day)
+
+# Fonction pour récupérer les variables sélectionnées
+get_support <- function(model) {
+  as.matrix(coef(model))[-1, , drop = FALSE] != 0  # enlève intercept
+}
+
+# Initialisation des vecteurs / matrices de résultats
+path_lasso   <- array(0, dim = c(p, L, n_rep), dimnames = list(vars, lambda_grid, NULL))
+lam_1se_lasso <- matrix(0, p, n_rep, dimnames = list(vars, NULL))
+
+for (r in 1:n_rep) {
+  # Ré-échantillonage
+  set.seed(100 + r)
+  idx <- sample(1:n,size=n,replace=TRUE)
+  new_day <- day[idx, ]
+  new_y <- new_day[,12]
+  new_X <- new_day[,-12]
+  new_X <- as.matrix(new_X) # Transformation en matrice nécessaire pour glmnet.
+  
+  # Lasso
+  ## fit pour chaque lambda
+  lasso_fit <- glmnet(new_X, new_y, alpha = 1, family="poisson", lambda = lambda_grid)
+  ## variables sélectionnées pour chaque fit
+  path_lasso[, , r] <- get_support(lasso_fit)
+}
+
+# On compte pour chaque variable pour chaque le nombre moyen de fois où elle est incluse
+stab_lasso <- apply(path_lasso, c(1,2), mean)
+```
+
+```{r}
+# Transformations pour les visualisation
+df_lasso <- as.data.frame(stab_lasso) %>%
+  mutate(variable = rownames(.)) %>%
+  pivot_longer(-variable, names_to = "lambda", values_to = "freq") %>%
+  mutate(lambda = as.numeric(lambda))
+
+# Visualisaiton avec ggplot
+ggplot(df_lasso, aes(x = lambda, y = variable, fill = freq)) +
+  geom_tile() +
+  geom_vline(xintercept = lambda.1se, color="indianred") +
+  scale_fill_gradient(low = "white", high = "black") +
+  labs(title = "Stabilité LASSO", x = "lambda", y = "variable")
+
+```
+La barre rouge correspond au lambda.1se obtenu précédement sur nos données originales (lambda.1se = 119.3585).
+
+# Sélection post-inférence
+
+## Construction d'un intervalle de confiance
+```{r}
+coefs.1se <- get_support(lasso.1se)
+coefs.1se
+```
+Les coefficients sélectionnés par LASSO sur les données originales avec lambda = lambda.1se sont :
+season, yr, holiday, weekday, weathsit, temp, atemp et windspeed.
+
+Construisons le modèle de régression de poisson avec ces variables là uniquement :
+```{r}
+# Jeu de données avec variables sélectionnées
+y <- day[,12]
+X_bis <- day[,-c(3,6,10,12)] # on enlève mnth, workingday, hum qui n'ont pas été sélectionnées et cnt qu'on veut prédire.
+
+# Régression de poisson correspondante
+model_poiss <- glm(y ~ ., data = X_bis, family = poisson)
+summary(model_poiss)
+
+# Esimateur de beta
+model_poiss$coefficients
+```
+On peut alors construire des intervalles de confiance pour tous les beta :
+```{r}
+confint(model_poiss)
+```
+A verifier si cela correspond bien à la formule demandée (il me semble que oui mais je n'ai plus le temps).
+
+
+
+
+
+
+
+
