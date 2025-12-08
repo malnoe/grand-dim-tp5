@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.28 (TeX Live 2025) (preloaded format=pdflatex 2025.12.8)  8 DEC 2025 11:23
+This is pdfTeX, Version 3.141592653-2.6-1.40.28 (TeX Live 2025) (preloaded format=pdflatex 2025.12.8)  8 DEC 2025 12:57
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -715,36 +715,32 @@ LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <10> not available
 
 {/Users/matmaz/Library/TinyTeX/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/Users/matmaz/Library/TinyTeX/texmf-dist/fonts/enc/dvips/lm/lm-ec.enc}]
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <9> on input line 229.
+(Font)              <9> on input line 210.
 [2]
-Underfull \hbox (badness 10000) in paragraph at lines 276--277
+Underfull \hbox (badness 10000) in paragraph at lines 257--258
 
  []
 
-LaTeX Font Info:    Trying to load font information for TS1+lmtt on input line 291.
+LaTeX Font Info:    Trying to load font information for TS1+lmtt on input line 282.
 (/Users/matmaz/Library/TinyTeX/texmf-dist/tex/latex/lm/ts1lmtt.fd
 File: ts1lmtt.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
-Overfull \hbox (96.8486pt too wide) in paragraph at lines 311--311
-[]\T1/lmtt/m/n/10 ## [1] "Variables sélectionnées (coef. non nuls) : season, yr, holiday, weekday, weathersit, temp, atemp, windspeed"[] 
- []
-
-[3{/Users/matmaz/Library/TinyTeX/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}]
 
 LaTeX Font Warning: Font shape `T1/lmtt/bx/it' in size <10> not available
-(Font)              Font shape `T1/lmtt/b/sl' tried instead on input line 378.
+(Font)              Font shape `T1/lmtt/b/sl' tried instead on input line 306.
 
-<tp_5_mazet_malnoe_files/figure-latex/hm1-1.pdf, id=37, 433.62pt x 289.08pt>
+[3{/Users/matmaz/Library/TinyTeX/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}]
+<tp_5_mazet_malnoe_files/figure-latex/hm1-1.pdf, id=38, 433.62pt x 252.945pt>
 File: tp_5_mazet_malnoe_files/figure-latex/hm1-1.pdf Graphic file (type pdf)
 <use tp_5_mazet_malnoe_files/figure-latex/hm1-1.pdf>
-Package pdftex.def Info: tp_5_mazet_malnoe_files/figure-latex/hm1-1.pdf  used on input line 403.
-(pdftex.def)             Requested size: 433.61894pt x 289.07928pt.
-[4]
-Underfull \hbox (badness 10000) in paragraph at lines 410--411
+Package pdftex.def Info: tp_5_mazet_malnoe_files/figure-latex/hm1-1.pdf  used on input line 331.
+(pdftex.def)             Requested size: 433.61894pt x 252.94438pt.
+
+Underfull \hbox (badness 10000) in paragraph at lines 366--367
 
  []
 
-[5 <./tp_5_mazet_malnoe_files/figure-latex/hm1-1.pdf>] (./tp_5_mazet_malnoe.aux)
+[4 <./tp_5_mazet_malnoe_files/figure-latex/hm1-1.pdf>] [5] (./tp_5_mazet_malnoe.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2025-11-14>
@@ -754,15 +750,15 @@ LaTeX Warning: There were multiply-defined labels.
 
  ) 
 Here is how much of TeX's memory you used:
- 14436 strings out of 469499
- 228622 string characters out of 5468201
- 674057 words of memory out of 5000000
- 42787 multiletter control sequences out of 15000+600000
+ 14433 strings out of 469499
+ 228545 string characters out of 5468201
+ 672057 words of memory out of 5000000
+ 42784 multiletter control sequences out of 15000+600000
  701268 words of font info for 96 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 77i,10n,81p,883b,485s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 77i,10n,81p,797b,485s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </Users/matmaz/Library/TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></Users/matmaz/Library/TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></Users/matmaz/Library/TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx9.pfb></Users/matmaz/Library/TinyTeX/texmf-dist/fonts/type1/public/lm/lmbxi10.pfb></Users/matmaz/Library/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr10.pfb></Users/matmaz/Library/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr12.pfb></Users/matmaz/Library/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr9.pfb></Users/matmaz/Library/TinyTeX/texmf-dist/fonts/type1/public/lm/lmri10.pfb></Users/matmaz/Library/TinyTeX/texmf-dist/fonts/type1/public/lm/lmtk10.pfb></Users/matmaz/Library/TinyTeX/texmf-dist/fonts/type1/public/lm/lmtko10.pfb></Users/matmaz/Library/TinyTeX/texmf-dist/fonts/type1/public/lm/lmtt10.pfb></Users/matmaz/Library/TinyTeX/texmf-dist/fonts/type1/public/lm/lmtti10.pfb>
-Output written on tp_5_mazet_malnoe.pdf (5 pages, 324467 bytes).
+Output written on tp_5_mazet_malnoe.pdf (5 pages, 326745 bytes).
 PDF statistics:
  128 PDF objects out of 1000 (max. 8388607)
  92 compressed objects within 1 object stream
