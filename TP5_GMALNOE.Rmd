@@ -215,7 +215,7 @@ coefs.1se
 Les coefficients sélectionnés par LASSO sur les données originales avec lambda = lambda.1se sont :
 season, yr, holiday, weekday, weathsit, temp, atemp et windspeed.
 
-Construisons le modèle de régression de poisson avec ces variables là uniquement :
+Construisons le modèle de régression de poisson avec ces variables uniquement :
 ```{r}
 # Jeu de données avec variables sélectionnées
 y <- day[,12]
@@ -223,16 +223,32 @@ X_bis <- day[,-c(3,6,10,12)] # on enlève mnth, workingday, hum qui n'ont pas é
 
 # Régression de poisson correspondante
 model_poiss <- glm(y ~ ., data = X_bis, family = poisson)
-summary(model_poiss)
 
 # Esimateur de beta
 model_poiss$coefficients
 ```
+
 On peut alors construire des intervalles de confiance pour tous les beta :
+
 ```{r}
-confint(model_poiss)
+# On récupère les beta et les écart-types
+beta <- model_poiss$coefficients
+se <- summary(model_poiss)$coefficients[, 2]
+
+# Calcul des bornes supérieure et inférieure
+borne.inf <- beta - qnorm(0.975)*se/sqrt(n)
+borne.sup <- beta + qnorm(0.975)*se/sqrt(n)
+
+data.frame(borne.inf=borne.inf,borne.sup=borne.sup)
 ```
-A verifier si cela correspond bien à la formule demandée (il me semble que oui mais je n'ai plus le temps).
+
+## Evaluation du niveau empirique
+```{r}
+nrep <- 100
+for(i in 1:nrep){
+  new_obs <- generate
+}
+```
 
 
 
