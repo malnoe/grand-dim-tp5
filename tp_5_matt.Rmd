@@ -77,8 +77,8 @@ Regardons maintenant sa stabilité sur 20 itérations. pour chaque itération, o
 set.seed(5)
 
 # Matrices des variables sélectionnées à chaque itérations
-mat_vars <- matrix(data = 0, ncol = ncol(X_train), nrow = 20)
-colnames(mat_vars) <- colnames(X_train)
+mat_vars <- matrix(data = 0, ncol = ncol(X), nrow = 20)
+colnames(mat_vars) <- colnames(X)
 
 # Itérations boostrap
 for (i in 1:20) {

@@ -24,7 +24,7 @@ library(tidyr)
 
 Importation du jeu de données
 ```{r}
-day <- read.csv("~/Ecole/M2/S1/Stat grande dimension/Partie 2 - Modèles pénalisés/day.csv") 
+day <- read.csv("day.csv") 
 # A modifier avec votre path
 ```
 

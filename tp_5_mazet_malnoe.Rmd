@@ -1,0 +1,186 @@
+---
+title: "***TP 5 - Compte rendu de groupe***"
+author: "Matthias MAZET, Garance MALNOË"
+date: "`r Sys.Date()`"
+output:
+  bookdown::pdf_document2:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+header-includes:
+ \usepackage{float}
+ \floatplacement{figure}{H}
+ \usepackage{mdframed}
+documentclass: article
+classoption: a4paper
+geometry: margin = 1.5 cm
+---
+
+
+\
+\
+\
+
+```{r, message=FALSE, warning=FALSE}
+# Packages statistiques
+library(glmnet)
+
+# Packages de style
+library(ggplot2)
+library(ggpubr) 
+library(GGally)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+```
+
+
+
+\newpage
+
+
+## *Préparation des données.*
+```{r}
+data <- read.csv("day.csv")
+```
+
+Pour simplifier les méthodes, nous supprimons la variable "dteday" qui est au format "chr". Nous supprimons aussi "casual" et "registered" qui, en les sommant, donne la valeur de la variable à prédire "cnt". Enfin, nous supprimons la variable "instant" qui correspond simplement à l'index de chaque observation. Nous vérifions ensuite les valeurs manquantes, la dimension des données et les valeurs aberrantes.
+```{r}
+# Nettoyage
+data <- data[, -c(1, 2, 14, 15)] # Suppression de variables
+paste("Nombre de valeurs manquantes :", sum(is.na(data)))
+paste("Dimension du dataset :", dim(data)[1], "x", dim(data)[2])
+
+# Résumés statistiques des variables
+kable(
+  summary(data[, 1:6], digits = 2), caption = "Résumé statistiques des 6 premières variables",
+  format = "latex", booktabs = TRUE, escape = FALSE, align = "r"
+) %>%
+  kable_styling(
+    latex_options = c("striped", "HOLD_position", "scale_down"), font_size = 9
+  ) %>%
+  row_spec(0, bold=TRUE)
+
+kable(
+  summary(data[, 7:12], digits = 2), caption = "Résumé statistiques des 6 dernières variables", 
+  digit = 3, format = "latex", booktabs = TRUE, escape = FALSE, align = "r"
+) %>%
+  kable_styling(
+    latex_options = c("striped", "HOLD_position", "scale_down"), font_size = 9
+  ) %>%
+  row_spec(0, bold=TRUE)
+```
+
+Il n'y a aucune valeurs manquantes, aucune variables ne semblent avoir de valeurs aberrantes (d'après les résumés statistiques) et nous sommes dans un cas où n > p, avec n le nombre d'observations et p le nombre de variables. Aussi, la variable à prédire, "cnt", compte le nombre d'emprunts de vélos réalisés dans une journée. Nous pouvons donc bien appliquer une régression de Poisson pour modéliser une variable de comptage. Dans ce but, nous séparons les données en X les variables explicatives, et y la variable à prédire.
+```{r}
+# Format matriciel pour glmnet
+X <- as.matrix(data[colnames(data) != "cnt"])
+y <- as.matrix(data$cnt)
+```
+\
+
+## *Estimation et stabilité de l'estimateur.*
+Nous ajustons un modèle de Poisson via `glmnet`. Pour cela, nous précisons `family = "poisson"` dans les fonctions de `glmnet`. Nous conservons arbitrairement la valeur de `lambda.1se` obtenue par validation croisée autonome.
+```{r}
+# Seed pour la reproductibilité
+set.seed(5)
+
+# Fit du modèle
+lambda_lasso_og <- cv.glmnet(x = X, y = y, alpha = 1, family = "poisson")$lambda.1se
+mod_lasso <- glmnet(x = X, y = y, alpha = 1, lambda = lambda_lasso_og, family = "poisson")
+
+# Variables sélectionnées (avec suppression de l'intercept)
+paste("Valeur de lambda.1se :", round(lambda_lasso_og, 3))
+paste(
+  "Variables sélectionnées (coef. non nuls) :", 
+  paste(colnames(data)[which(coef(mod_lasso) != 0)[-1] - 1], collapse = ", ")
+)
+```
+
+Regardons maintenant la stabilité de sélection de variables sur 20 itérations. pour chaque itération, nous regardons quelles variables sont sélectionnées à `lambda.1se` et nous stockons l'information dans une matrice. Nous stockons aussi les différentes valeurs de `lambda.1se` obtenue afin d'observer sa stabilité.
+```{r}
+set.seed(5)
+
+# Nombre d'itérations
+n_it <- 20
+
+# Matrices des variables sélectionnées à chaque itérations
+mat_vars <- matrix(data = 0, ncol = ncol(X), nrow = 20)
+colnames(mat_vars) <- colnames(X)
+
+# Vecteur des valeurs de `lambda.1se`
+lambda_1se <- numeric(20)
+
+# Itérations boostrap
+for (i in 1:n_it) {
+  # Individus bootstrap
+  ind_al <- sample(1:nrow(data), size = nrow(data), replace = TRUE)
+  X <- as.matrix(data[ind_al, colnames(data) != "cnt"])
+  y <- data[ind_al, "cnt"]
+  # Fit du modèle
+  lambda_1se[i] <- cv.glmnet(x = X, y = y, alpha = 1, family = "poisson")$lambda.1se
+  mod_lasso <- glmnet(x = X, y = y, alpha = 1, lambda = lambda_1se[i], family = "poisson")
+  # Variables sélectionnées à lambda.1se
+  mat_vars[i, which(coef(mod_lasso) != 0)[-1] - 1] <- 1
+}
+
+# Stabilité de lambda_1se
+kable(
+  summary(data.frame("lambda.1se" = lambda_1se)), caption = "Résumé statistique des lambda.1se",
+  format = "latex", booktabs = TRUE, escape = FALSE, align = "r"
+) %>%
+  kable_styling(
+    latex_options = c("striped", "HOLD_position", "scale_down"), font_size = 9
+  ) %>%
+  row_spec(0, bold=TRUE)
+```
+
+```{r hm1, fig.align="center", fig.width=6, fig.height=4, fig.cap="Stabilité à lambda.1se au fil des itérations"}
+# Stabilité des variables
+### Dataset de résultat au format long
+df_lasso <- t(mat_vars) %>%
+  as.data.frame() %>%
+  mutate(variable = rownames(.)) %>%
+  pivot_longer(cols = -variable, names_to = "iteration", values_to = "selected") %>%
+  mutate(iteration = as.numeric(gsub("V", "", iteration)))
+### Figure ggplot
+ggplot(df_lasso, aes(x = iteration, y = variable, fill = selected)) +
+  geom_tile() +
+  scale_fill_gradientn(colours = c("white", "black"), limits = c(0, 1), name = "Sélection") +
+  labs(x = "Itération", y = "Indices des variables") +
+  theme_light() +
+  theme(
+    axis.text = element_text(size = 8),
+    axis.line = element_line(colour = "grey"),
+    panel.border = element_blank(),
+    panel.grid = element_blank(),
+    legend.title = element_text(size = 10, face = "bold"),
+    legend.position = "right"
+  )
+```
+
+La figure précédente **(Fig. \@ref(fig:hm1))** présente les variables sélectionnées à chaque itération, avec 1 = variable sélectionnée et 0 sinon (la légende de couleur devrait être discrète mais ggplot ne le fait pas). On peut constater que certaines variables ("yr" ou "windspeed" par exemple) sont toujours sélectionnées, tandis que d'autres le sont aléatoirement suivant l'itération ("hum" ou "temp" par exemple). La variable "mnth" n'est à l'inverse jamais sélectionnée. La méthode présente donc une légère instabilité sur la sélection de variables, ce qui peut témoigner de multicolinéarité entre certaines variables (notamment celles sélectionnées quelquefois mais pas toutes). Cette remarque correspond à l'interprétation de la (in)stabilité dans la sélection de variables.
+\
+
+## *Sélection post-inférence.*
+
+  1. *Construction d'un intervalle de confiance.*
+```{r}
+alpha <- .05
+n <- nrow(data)
+# Estimation des beta par glmnet
+beta_hat <- coef(mod_lasso)[-1]
+sd_beta_hat <- numeric(length(beta_hat))
+for (i in 1:length(beta_hat)) {
+  sd_beta_hat[i] <- sd(beta_hat[i])
+}
+
+# Intervalle de confiances
+borne_inf <- beta_hat - (qnorm(1 - alpha/2)*sd_beta_hat / sqrt(n))
+borne_sup <- beta_hat + (qnorm(1 - alpha/2)*sd_beta_hat / sqrt(n))
+```
+
+
+
+
+
