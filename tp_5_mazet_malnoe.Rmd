@@ -222,7 +222,107 @@ Cette figure **(Fig. \@ref(fig:hm2))** nous permet de constater que la valeur de
 ## *Sélection post-inférence.*
 
   1. *Construction d'un intervalle de confiance.*
+  
+```{r}
+coefs.1se <- get_support(lasso.1se)
+coefs.1se
+```
+Les coefficients sélectionnés par LASSO sur les données originales avec lambda = lambda.1se sont :
+season, yr, holiday, weekday, weathsit, temp, atemp et windspeed.
 
+Construisons le modèle de régression de poisson avec ces variables uniquement :
+```{r}
+y <- day[, 12]
+X_bis <- day[, -c(3,6,10,12)]
+
+# Régression de poisson correspondante
+model_poiss <- glm(y ~ . , data = X_bis, family = poisson)
+
+# Esimateur de beta
+model_poiss$coefficients
+```
+
+On peut alors construire des intervalles de confiance pour tous les beta :
+
+```{r}
+# Coefficients beta
+beta_true <- numeric(ncol(X_bis) + 1)
+names(beta_true) <- c("(Intercept)", colnames(X_bis))
+beta_true[names(coef(model_poiss))] <- coef(model_poiss)
+
+# Ecarts-type
+se <- summary(model_poiss)$coefficients[, 2]
+
+# Calcul des bornes supérieure et inférieure
+borne.inf <- beta_true - qnorm(0.975)*se/sqrt(n)
+borne.sup <- beta_true + qnorm(0.975)*se/sqrt(n)
+
+# Résultat
+data.frame(borne.inf=borne.inf,borne.sup=borne.sup)
+```
+
+  2. *Evaluation du niveau empirique.*
+On a vu en cours que : 
+$$
+\lambda_i = \mathbb{E}[Y_i|X_i] = exp(x_i^T\hat\beta)
+$$
+
+```{r}
+# Nombre de répétition
+nrep <- 100
+
+# Compteurs pour la couverture
+compteur_couverture <- setNames(numeric(length(beta_true)), names(beta_true))
+nbr_intervales     <- setNames(numeric(length(beta_true)), names(beta_true))
+
+# On récupère les lambda_i pour les n individus
+lambda_hat <- predict(model_poiss, type = "response") # pred pour les données originale taille n
+
+for(i in 1:nrep){
+  # On simule de nouvelles valeurs pour cnt suivant le modèle, avec lambda_i = l'intensité pour l'obs i = lambda_hat[i]
+  set.seed(100+i)
+  y_sim <- rpois(n, lambda = lambda_hat)
+  # Ajustement d'un modèle LASSO avec lambda = lambda.1se
+  cv_i <- cv.glmnet(as.matrix(X_bis),y_sim,family="poisson")
+  lambda_i <- cv_i$lambda.1se
+  
+  # Récupération du support correspondant
+  coef_i <- coef(cv_i, s=lambda_i)
+  index_col_select <- which(as.vector(coef_i[-1,1])!=0)
+  
+  # Calcul du modèle de poisson, récupération du beta.hat et des intervalles de confiance
+  X_act_i <- X_bis[,index_col_select,drop=FALSE]
+  model_poiss_i <- glm(y_sim ~ . , data = X_act_i, family = poisson)
+  
+  # Récupération du beta et se pour les coefficients actifs
+  beta_i <- numeric(ncol(X_act_i) + 1)
+  names(beta_i) <- c("(Intercept)", colnames(X_act_i))
+  beta_i[names(coef(model_poiss_i))] <- coef(model_poiss_i)
+  se <- summary(model_poiss_i)$coefficients[, 2]
+  borne.inf_i <- beta_i - qnorm(0.975)*se/sqrt(n)
+  borne.sup_i <- beta_i + qnorm(0.975)*se/sqrt(n)
+  # Évaluation si coefficient vrai est dans intervalle de confiance
+  for(name in names(borne.inf_i)){
+    beta_true_j <- beta_true[name]
+    inf <- borne.inf_i[name]
+    sup <- borne.sup_i[name]
+    nbr_intervales[name] <- nbr_intervales[name] + 1 # On augmente le compteur de 1
+    if (beta_true_j >= inf && beta_true_j <= sup) {
+      compteur_couverture[name] <- compteur_couverture[name] + 1
+    }
+  }
+}
+
+niveau_empirique <- compteur_couverture / nbr_intervales
+compteur_couverture
+nbr_intervales
+niveau_empirique
+mean(niveau_empirique)
+```
+Nous obtenons un niveau de confiance moyen de 7% contre les 100(1-alpha) = 95% qui seraient attendus. Cela est du au fait que nous effectuions une inférence naïve après avoir déjà fait une sélection : nous avons sélectionné les variables actives avec LASSO (qui dépend des données) puis nous faisons une seconde inférence naïve classique qui suppose que le modèle est fixé avant de regarder les données (or on les a déjà vues avec LASSO pour choisir le modèle). Cela donnent lieu à des intervalles de confiance très très resserrés, trop optimiste dans lequel la véritable valeur ne se trouve pas.
+Le modèle étant choisi via les données, les intervalles de confiance classiques sont fortement resserrés.
+
+Il est donc nécessaire d'opter pour une approche afin d'obtenir des intervalles de confiance : data-splitting (problème c'est qu'on perd une partie des données) ou selectiveInference que nous avons vu en cours.
 
 
 
