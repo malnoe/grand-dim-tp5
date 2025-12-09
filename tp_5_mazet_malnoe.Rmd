@@ -58,7 +58,9 @@ kable(
     latex_options = c("striped", "HOLD_position", "scale_down"), font_size = 9
   ) %>%
   row_spec(0, bold=TRUE)
+```
 
+```{r}
 kable(
   summary(data[, 7:12], digits = 2), caption = "Résumé statistiques des 6 dernières variables", 
   digit = 3, format = "latex", booktabs = TRUE, escape = FALSE, align = "r"
@@ -68,6 +70,8 @@ kable(
   ) %>%
   row_spec(0, bold=TRUE)
 ```
+
+
 
 Il n'y a aucune valeurs manquantes (`sum(is.na(data))` = 0), aucune variables ne semblent avoir de valeurs aberrantes (d'après les résumés statistiques) et nous sommes dans un cas où (n = 731) > (p = 12) , avec n le nombre d'observations et p le nombre de variables. Aussi, la variable à prédire, "cnt", compte le nombre d'emprunts de vélos réalisés dans une journée. Nous pouvons donc bien appliquer une régression de Poisson pour modéliser une variable de comptage. Dans ce but, nous séparons les données en X les variables explicatives, et y la variable à prédire.
 ```{r}
@@ -107,9 +111,9 @@ for (i in 1:n_it) {
   X <- as.matrix(data[ind_al, colnames(data) != "cnt"])
   y <- data[ind_al, "cnt"]
   # Fit du modèle
-  mod_lasso <- glmnet(x = X, y = y, alpha = 1, lambda = lambda_1se, family = "poisson")
+  mod_lasso_i <- glmnet(x = X, y = y, alpha = 1, lambda = lambda_1se, family = "poisson")
   # Variables sélectionnées à lambda.1se
-  mat_vars[i, which(coef(mod_lasso) != 0)[-1] - 1] <- 1
+  mat_vars[i, which(coef(mod_lasso_i) != 0)[-1] - 1] <- 1
 }
 ```
 
@@ -215,7 +219,7 @@ ggplot(df_lasso, aes(x = lambda, y = variable, fill = freq)) +
     legend.position = "right"
   )
 ```
-Cette figure **(Fig. \@ref(fig:hm2))** nous permet de constater que la valeur de `lambda.1se` exhibée avec les données initiales se généralise assez bien sur des données bootstrap. En effet, cette valeur (ligne rouge) se trouve dans une zone assez stable sur le chemin de régularisation : seules "windspeed", "weekday" et "holiday" sont en grises, et donc sélectionnées aléatoirement suivant l'itération.
+Cette figure **(Fig. \@ref(fig:hm2))** nous permet de constater que la valeur de `lambda.1se` exhibée avec les données initiales se généralise assez bien sur des données bootstrap. En effet, cette valeur (ligne rouge) se trouve dans une zone assez stable sur le chemin de régularisation : seules "temp", windspeed", "weekday" et "holiday" sont en grises, et donc sélectionnées aléatoirement suivant l'itération.
 
 \
 
@@ -224,16 +228,16 @@ Cette figure **(Fig. \@ref(fig:hm2))** nous permet de constater que la valeur de
   1. *Construction d'un intervalle de confiance.*
   
 ```{r}
-coefs.1se <- get_support(lasso.1se)
-coefs.1se
+coefs.1se <- get_support(mod_lasso)
+coefs.1se # A mettre au propre avec kabble
 ```
 Les coefficients sélectionnés par LASSO sur les données originales avec lambda = lambda.1se sont :
 season, yr, holiday, weekday, weathsit, temp, atemp et windspeed.
 
 Construisons le modèle de régression de poisson avec ces variables uniquement :
 ```{r}
-y <- day[, 12]
-X_bis <- day[, -c(3,6,10,12)]
+y <- data[, 12]
+X_bis <- data[, -c(3,6,10,12)]
 
 # Régression de poisson correspondante
 model_poiss <- glm(y ~ . , data = X_bis, family = poisson)
@@ -241,37 +245,39 @@ model_poiss <- glm(y ~ . , data = X_bis, family = poisson)
 # Esimateur de beta
 model_poiss$coefficients
 ```
+Mette commentaire sur les coefficients du beta, mise en forme dynamique.
 
 On peut alors construire des intervalles de confiance pour tous les beta :
-
 ```{r}
-# Coefficients beta
+# Coefficients beta et mise en forme
 beta_true <- numeric(ncol(X_bis) + 1)
 names(beta_true) <- c("(Intercept)", colnames(X_bis))
 beta_true[names(coef(model_poiss))] <- coef(model_poiss)
 
-# Ecarts-type
+# Ecarts-types
 se <- summary(model_poiss)$coefficients[, 2]
 
-# Calcul des bornes supérieure et inférieure
+# Calcul des bornes supérieures et inférieures
 borne.inf <- beta_true - qnorm(0.975)*se/sqrt(n)
 borne.sup <- beta_true + qnorm(0.975)*se/sqrt(n)
 
 # Résultat
-data.frame(borne.inf=borne.inf,borne.sup=borne.sup)
+data.frame(borne.inf=borne.inf,borne.sup=borne.sup) # a mettre en kabble
 ```
+Commentaire sur le faite que ce soit très resséré.
 
   2. *Evaluation du niveau empirique.*
-On a vu en cours que : 
+On a vu en cours que :  à développer propre avec le cours.
 $$
 \lambda_i = \mathbb{E}[Y_i|X_i] = exp(x_i^T\hat\beta)
 $$
+
 
 ```{r}
 # Nombre de répétition
 nrep <- 100
 
-# Compteurs pour la couverture
+# Compteurs pour la couverture et le nombre d'intervales
 compteur_couverture <- setNames(numeric(length(beta_true)), names(beta_true))
 nbr_intervales     <- setNames(numeric(length(beta_true)), names(beta_true))
 
@@ -282,6 +288,7 @@ for(i in 1:nrep){
   # On simule de nouvelles valeurs pour cnt suivant le modèle, avec lambda_i = l'intensité pour l'obs i = lambda_hat[i]
   set.seed(100+i)
   y_sim <- rpois(n, lambda = lambda_hat)
+  
   # Ajustement d'un modèle LASSO avec lambda = lambda.1se
   cv_i <- cv.glmnet(as.matrix(X_bis),y_sim,family="poisson")
   lambda_i <- cv_i$lambda.1se
@@ -294,20 +301,23 @@ for(i in 1:nrep){
   X_act_i <- X_bis[,index_col_select,drop=FALSE]
   model_poiss_i <- glm(y_sim ~ . , data = X_act_i, family = poisson)
   
-  # Récupération du beta et se pour les coefficients actifs
+  # Récupération du beta_i et se_i pour les coefficients actifs
   beta_i <- numeric(ncol(X_act_i) + 1)
   names(beta_i) <- c("(Intercept)", colnames(X_act_i))
   beta_i[names(coef(model_poiss_i))] <- coef(model_poiss_i)
   se <- summary(model_poiss_i)$coefficients[, 2]
   borne.inf_i <- beta_i - qnorm(0.975)*se/sqrt(n)
   borne.sup_i <- beta_i + qnorm(0.975)*se/sqrt(n)
-  # Évaluation si coefficient vrai est dans intervalle de confiance
+  
+  # Évaluation si coefficient vrai est dans l'intervalle de confiance
   for(name in names(borne.inf_i)){
     beta_true_j <- beta_true[name]
     inf <- borne.inf_i[name]
     sup <- borne.sup_i[name]
-    nbr_intervales[name] <- nbr_intervales[name] + 1 # On augmente le compteur de 1
+    nbr_intervales[name] <- nbr_intervales[name] + 1 # On augmente le compteur d'intervalle de 1
     if (beta_true_j >= inf && beta_true_j <= sup) {
+      # Si la vraie valeur de beta est dans l'intervalle de l'itération i
+      # on augmente le compteur de 1.
       compteur_couverture[name] <- compteur_couverture[name] + 1
     }
   }
@@ -323,6 +333,13 @@ Nous obtenons un niveau de confiance moyen de 7% contre les 100(1-alpha) = 95% q
 Le modèle étant choisi via les données, les intervalles de confiance classiques sont fortement resserrés.
 
 Il est donc nécessaire d'opter pour une approche afin d'obtenir des intervalles de confiance : data-splitting (problème c'est qu'on perd une partie des données) ou selectiveInference que nous avons vu en cours.
+
+-> détailler ce qu'est le data-splitting, voir cours.
+50% pour sélectionner les variables via LASSO.
+50% pour faire l'inférence des intervalles de confiance.
+-> dire qu'on a déjà testé en TP et qu'on a montré que cela amenait au niveau de confiance attendu.
+
+Le défi c'est d'avoir suffisament de données pour pouvoir faire le data-splitting
 
 
 
