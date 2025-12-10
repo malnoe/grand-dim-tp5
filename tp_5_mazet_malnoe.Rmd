@@ -248,12 +248,12 @@ nbr_intervales     <- setNames(numeric(length(beta_true)), names(beta_true))
 lambda_hat <- predict(model_poiss, type = "response") # pred pour les données originale taille n
 
 for(i in 1:nrep){
-  # On simule de nouvelles valeurs pour cnt suivant le modèle, avec lambda_i = l'intensité pour l'obs i = lambda_hat[i]
-  set.seed(100+i)
+  # On simule de nouvelles valeurs pour cnt suivant le modèle, avec 
+  #lambda_i = l'intensité pour l'obs i = lambda_hat[i]
   y_sim <- rpois(n, lambda = lambda_hat)
   
-  # Ajustement d'un modèle LASSO avec lambda = lambda.1se
-  cv_i <- cv.glmnet(as.matrix(X_bis),y_sim,family="poisson")
+  # Ajustement d'un modèle LASSO avec lambda = lambda.1se sur l'ensemble des variables predictive
+  cv_i <- cv.glmnet(as.matrix(X),y_sim,family="poisson")
   lambda_i <- cv_i$lambda.1se
   
   # Récupération du support correspondant
@@ -261,8 +261,8 @@ for(i in 1:nrep){
   index_col_select <- which(as.vector(coef_i[-1,1])!=0)
   
   # Calcul du modèle de poisson, récupération du beta.hat et des intervalles de confiance
-  X_act_i <- X_bis[,index_col_select,drop=FALSE]
-  model_poiss_i <- glm(y_sim ~ . , data = X_act_i, family = poisson)
+  X_act_i <- X[,index_col_select,drop=FALSE]
+  model_poiss_i <- glm(y_sim ~ . , data = as.data.frame(X_act_i), family = poisson)
   
   # Récupération du beta_i et se_i pour les coefficients actifs
   beta_i <- numeric(ncol(X_act_i) + 1)
@@ -274,14 +274,16 @@ for(i in 1:nrep){
   
   # Évaluation si coefficient vrai est dans l'intervalle de confiance
   for(name in names(borne.inf_i)){
-    beta_true_j <- beta_true[name]
-    inf <- borne.inf_i[name]
-    sup <- borne.sup_i[name]
-    nbr_intervales[name] <- nbr_intervales[name] + 1 # On augmente le compteur d'intervalle de 1
-    if (beta_true_j >= inf && beta_true_j <= sup) {
-      # Si la vraie valeur de beta est dans l'intervalle de l'itération i
-      # on augmente le compteur de 1.
-      compteur_couverture[name] <- compteur_couverture[name] + 1
+    if(name %in% names(beta_true)){
+      beta_true_j <- beta_true[name]
+      inf <- borne.inf_i[name]
+      sup <- borne.sup_i[name]
+      nbr_intervales[name] <- nbr_intervales[name] + 1 # On augmente le compteur d'intervalle de 1
+      if (beta_true_j >= inf && beta_true_j <= sup) {
+        # Si la vraie valeur de beta est dans l'intervalle de l'itération i
+        # on augmente le compteur de couverture de 1.
+        compteur_couverture[name] <- compteur_couverture[name] + 1
+      }
     }
   }
 }
