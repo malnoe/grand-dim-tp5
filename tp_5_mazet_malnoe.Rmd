@@ -1,5 +1,5 @@
 ---
-title: "***TP 5 - Régression linéaire de Poisson - Compte rendu de groupe***"
+title: "***TP 5 - Régression de Poisson - Compte rendu de groupe***"
 author: "Matthias MAZET, Garance MALNOË"
 date: "`r Sys.Date()`"
 output:
@@ -11,8 +11,6 @@ header-includes:
  \usepackage{float}
  \floatplacement{figure}{H}
  \usepackage{mdframed}
-documentclass: article
-classoption: a4paper
 geometry: margin = 1.5 cm
 ---
 
@@ -46,22 +44,20 @@ Nous récupérons le jeu de données *bike sharing* à partir du fichier CSV dis
 data <- read.csv("day.csv")
 ```
 
-Nous supprimons la variable "dteday" qui indique le jour étudié qui se trouve au format "chr" et qui ne nous semble pas pertienent. Nous supprimons également les variables "casual" et "registered" qui correspondent au deux types de location possibles dont la somme est égale à la variable à prédire "cnt". Enfin, nous supprimons aussi la variable "instant" qui correspond simplement à l'index de chaque observation.
-
+Nous supprimons la variable `dteday` (jour étudié) qui se trouve au format "chr" et qui ne nous semble pas pertinente. Nous supprimons également les variables `casual` et `registered` qui correspondent aux deux types de location possibles et dont la somme est égale à la variable à prédire `cnt`. Enfin, nous supprimons aussi la variable `instant` qui correspond simplement à l'index de chaque observation.
 ```{r}
 # Nettoyage
 data <- data[, -c(1, 2, 14, 15)] # Suppression de variables
 ```
 
-
 Nous vérifions ensuite les valeurs manquantes, la dimension des données et les valeurs aberrantes.
-
 ```{r}
-sum(is.na(data))
-dim(data)
+sum(is.na(data)) # Valeurs manquante
+dim(data) # Dimensions du jeu de données
 ```
-Le jeu de données ne compte aucune valeur valeur manquante (`sum(is.na(data))` = 0) et compte ainsi $n=731$ observations de $p=12$ variables (une variable à prédire et onze variables prédictives). Il est bon de noter que nous sommes dans un cas où $n>p$.
+Le jeu de données ne compte aucune valeur manquante (`sum(is.na(data))` = 0). Il est composé de $n=731$ observations de $p=12$ variables (une variable à prédire et onze variables prédictives). Il est bon de noter que nous sommes dans un cas où $n>p$.
 
+Nous vérifions finalement la présence de données aberrantes.
 ```{r}
 # Résumés statistiques des variables
 kable(
@@ -85,33 +81,32 @@ kable(
   row_spec(0, bold=TRUE)
 ```
 
-D'après les résumés statistiques, aucune variable ne semble avoir de valeur aberrante qui serait à exlcure.
+D'après les résumés statistiques, aucune variable ne semble avoir de valeur aberrante qui serait à exclure **(Tab. 1, Tab. 2)**.
 
-Dans le cadre de notre étude, nous souhaitons prédire la variable "cnt", qui compte le nombre d'emprunts de vélos réalisés dans une journée et est donc une variables de comptage. Ainsi, nous pouvons donc bien appliquer une régression de Poisson afin de modéliser cette variable.
+Dans le cadre de notre étude, nous souhaitons prédire la variable `cnt`, qui compte le nombre d'emprunts de vélos réalisés dans une journée et est donc une variable de comptage. Nous pouvons donc bien appliquer une régression de Poisson afin de la modéliser.
+\
 \
 
 # *Estimation et stabilité de l'estimateur.*
 
-Nous souhaitons ajuster un modèle de régression de Poisson tout en applicant une régularisation LASSO afin d'effectuer une sélection des variables prédictive. Pour cela, nous allons utiliser le package `glmnet` en précisant l'argument `family = "poisson"` dans l'appel des fonctions. Nous conservons arbitrairement la valeur de `lambda.1se` obtenue par validation croisée commme meilleure valeur du paramètre de régularisation.
-
+Nous souhaitons ajuster un modèle de régression de Poisson tout en appliquant une régularisation LASSO afin d'effectuer une sélection des variables prédictives. Pour cela, nous utilisons le package `glmnet` en précisant l'argument `family = "poisson"` dans l'appel des fonctions. Nous conservons arbitrairement la valeur de `lambda.1se` obtenue par validation croisée comme meilleure valeur du paramètre de régularisation.
 ```{r, cache=TRUE}
 # Format matriciel pour glmnet
 X <- as.matrix(data[colnames(data) != "cnt"])
 y <- as.matrix(data$cnt)
 
 # Seed pour la reproductibilité
-set.seed(5)
+set.seed(2)
 
 # Fit du modèle
 lambda_1se <- cv.glmnet(x = X, y = y, alpha = 1, family = "poisson")$lambda.1se
 mod_lasso <- glmnet(x = X, y = y, alpha = 1, lambda = lambda_1se, family = "poisson")
 ```
 
-Le paramètre de régularisation retenu est `lambda.1se` = `r round(lambda_1se, 3)`, et les variables sélectionnées avec les données de base et cette valeur sont : `r paste(colnames(data)[which(coef(mod_lasso) != 0)[-1] - 1], collapse = ", ")`.
+Le paramètre de régularisation retenu est `lambda.1se` = `r round(lambda_1se, 3)`, et les variables sélectionnées via ce modèle entraîné sur l'ensemble des données de bases sont : `r paste(colnames(data)[which(coef(mod_lasso) != 0)[-1] - 1], collapse = ", ")`.
 
 Nous souhaitons maintenant analyser la stabilité de la sélection des variables. Pour cela, nous effectuons un bootstrap sur les données avec 100 itérations. Pour chaque itération, nous regardons quelles variables ont été sélectionnées lorsque l'on choisit comme paramètre de régularisation le `lambda.1se` obtenu par validation croisée sur les nouvelles données. Nous obtenons finalement une matrice nous indiquant, pour chaque itération, quelles variables ont été sélectionnées et ainsi estimer la fréquence de sélection de chaque variable.
-
-```{r,cache=TRUE}
+```{r, cache=TRUE}
 set.seed(2) # Reproductibilité
 
 # Nombre d'itérations
@@ -170,26 +165,27 @@ kable(
   row_spec(0, bold=TRUE)
 ```
 
-Nous obtenons finalement une matrice nous indiquant, pour chaque itération, quelles variables ont été sélectionnées et ainsi estimer la fréquence de sélection de chaque variable.
+La figure précédente **(Fig. \@ref(fig:hm1))** présente les variables sélectionnées à chaque itération, avec 1 = "la variable a été sélectionnée" et 0 sinon (la légende de couleur devrait être discrète (0 et 1) mais ggplot n'accepte pas ce format sur une heatmap).
+D'une part, 5 variables semblent stables en termes de sélection : les variables `season`, `yr`, `weathersit` et `atemp` sont systématiquement sélectionnées, et la variable `mnth` ne l'est jamais.
+D'autre part, les autres variables (`holiday`, `weekday`, `workingday`,`temp`, `hum` et `windspeed`) sont sélectionnées de manière instable (entre 5% et 95% du temps) **(Tab. 3)**. 
 
-
-La figure précédente **(Fig. \@ref(fig:hm1))** présente les variables qui ont été sélectionnées à chaque itération, avec 1 = la variable a été sélectionnée et 0 sinon (la légende de couleur devrait être discrète (0 et 1) mais ggplot ne l'accepte pas sur une heatmap). Nous constatons que les variables "seasons", "yr", "weathersit" et "atemp" sont systématiquement sélectionnées et qu'à l'inverse la variable "mnth" n'est jamais sélecionnée, toutes ces variables sont sélectionnées de manière stable. Au contraire, les variables "holiday", "weekday", "workingday","temp", "hum" et "windspeed" sont sélectionnées de manière instable (entre 5% et 95% du temps). La méthode LASSO en choisissant `lambda.1se` comme paramètre de régularisation présente donc une instabilité sur la sélection des variables, potentiellement du à la présence de multicolinéarité entre certaines variables.
+La méthode LASSO, en choisissant `lambda.1se` comme paramètre de régularisation, présente donc une instabilité sur la sélection des variables. Cette instabilité est potentiellement due à la présence de multicolinéarité entre certaines variables.
+\
 \
 
 # *Sélection post-inférence.*
 
   1. *Construction d'un intervalle de confiance.*
   
-Nous souhaitons maintenant construire un intervalle de confiance pour $\hat\beta$ l'estimateur du maximum de vraisemblance restreint à $\hat S$, l'ensemble des variables sélectionnées par `glmnet` avec pour paramètre de régularisation `lambda.1se`.  Pour cela, on utilise une approche naïve basée sur la normalité asymptotique de l'estimateur du maximum de vraisemblance pour obtenir un intervalle de confiance au niveau 1 - $\alpha$ pour chaque coefficient $\hat\beta_j$ de $\hat\beta$:
+Nous souhaitons maintenant construire un intervalle de confiance pour $\hat\beta$ l'estimateur du maximum de vraisemblance restreint à $\hat S$, l'ensemble des variables sélectionnées par `glmnet` avec pour paramètre de régularisation `lambda.1se`.  Pour cela, nous utilisons une approche naïve basée sur la normalité asymptotique de l'estimateur du maximum de vraisemblance pour obtenir un intervalle de confiance au niveau 1 - $\alpha$ pour chaque coefficient $\hat\beta_j$ de $\hat\beta$ :
 $$
-\hat{IC}^j_{\alpha} = [\hat\beta_j - \frac{q_{1-\alpha/2}\hat\sigma_j}{\sqrt{n}} ; \hat\beta_j + \frac{q_{1-\alpha/2}\hat\sigma_j}{\sqrt{n}}]
+\hat{IC}^j_{\alpha} = \left[\hat\beta_j - \frac{q_{1-\frac{\alpha}{2}}\hat\sigma_j}{\sqrt{n}} ; \hat\beta_j + \frac{q_{1-\frac{\alpha}{2}}\hat\sigma_j}{\sqrt{n}}\right]
 $$
 
-Les coefficients sélectionnés par LASSO sur les données originales avec lambda = `lambda.1se` sont : `r paste(colnames(data)[which(coef(mod_lasso) != 0)[-1] - 1], collapse = ", ")`. Construisons le modèle de régression de Poisson avec ces variables uniquement.
-
+Les coefficients non nuls sélectionnés par LASSO sur les données originales avec lambda = `lambda.1se` concernent les variables `r paste(colnames(data)[which(coef(mod_lasso) != 0)[-1] - 1], collapse = ", ")`. Nous construisons donc le modèle de régression de Poisson restreint à ces variables.
 ```{r}
 # Données avec uniquement les variables sélectionnées
-y <- data[, 12]
+y <- data$cnt
 X_bis <- data[, -c(3,6,10,12)]
 
 # Régression de poisson correspondante
@@ -197,104 +193,111 @@ model_poiss <- glm(y ~ . , data = X_bis, family = poisson)
 
 # Esimateur de beta
 kable(
-  t(model_poiss$coefficients), caption = "Coefficient de l'estimateur du maximum 
-  de vraisemblance beta.hat", 
-  format = "latex", booktabs = TRUE, escape = FALSE, align = "r"
+  t(model_poiss$coefficients), 
+  caption = "Coefficients de l'estimateur du maximum de vraisemblance $\\hat\\beta$", 
+  digits = 3, format = "latex", booktabs = TRUE, escape = FALSE, align = "r"
 ) %>%
   kable_styling(latex_options = c("striped", "HOLD_position", "scale_down"), font_size = 9) %>%
   row_spec(0, bold=TRUE)
 ```
 
-Nous pouvons alors construire les intervalles de confiance pour tous les $\hat\beta_j$ au niveau $\alpha=0.05$ ou 95% :
-
+Nous pouvons alors construire les intervalles de confiance pour tous les $\hat\beta_j$ au niveau $\alpha=0.05$ :
 ```{r}
+# Seuil alpha
+alpha <- .05
 # Coefficients beta et mise en forme
 beta_true <- numeric(ncol(X_bis) + 1)
 names(beta_true) <- c("(Intercept)", colnames(X_bis))
 beta_true[names(coef(model_poiss))] <- coef(model_poiss)
 
-# Ecarts-types
+# Écarts-types
 se <- summary(model_poiss)$coefficients[, 2]
 
 # Calcul des bornes supérieures et inférieures
 n <- dim(data)[1]
-borne.inf <- beta_true - qnorm(0.975)*se/sqrt(n)
-borne.sup <- beta_true + qnorm(0.975)*se/sqrt(n)
+borne_inf <- beta_true - qnorm(1 - alpha/2)*se/sqrt(n)
+borne_sup <- beta_true + qnorm(1 - alpha/2)*se/sqrt(n)
 
 # Résultat
 kable(
-  t(data.frame(borne.inf=borne.inf,borne.sup=borne.sup)), caption = "Intervalles
-  de confiance des variables sélectionnées", 
-  format = "latex", booktabs = TRUE, escape = FALSE, align = "r"
+  t(data.frame("borne inférieure" = borne_inf, "borne supérieure" = borne_sup)), 
+  caption = "Intervalles de confiance des variables sélectionnées", 
+  digits = 3, format = "latex", booktabs = TRUE, escape = FALSE, align = "r"
 ) %>%
   kable_styling(latex_options = c("striped", "HOLD_position", "scale_down"), font_size = 9) %>%
   row_spec(0, bold=TRUE)
 ```
-Nous constatons dans la table 5 que les intervalles de confiances sont tous très ressérés autour de la valeur du coefficient $\hat\beta_j$.
+Nous constatons que les intervalles de confiances sont tous très resserrés autour de la valeur du coefficient $\hat\beta_j$ **(Tab. 4, Tab. 5)**.
+\
 
-  2. *Evaluation du niveau empirique.*
+  2. *Évaluation du niveau empirique.*
   
-Nous souhaitons maintenant évaluer le niveau empirique de ces intervalles de confiance, sachant que le niveau de confiance attendue serait de 95%. Pour cela, nous allons générer 100 fois de nouvelles données simulées à partir du modèle : pour chaque individu $i$ nous simulons une valeur selon une loi de Poisson $\mathcal{P}(\lambda_i)$ avec $\lambda_i = \mathbb{E}[Y_i|X_i]$ l'intensité de de l'individu $i$. Pour chaque itération, nous ajustons un modèle régularisé en utilisant les données simulées pour obtenir de nouveaux intervalles de confiance pour les variables qui auront été sélectionnées puis nous vérifions si la véritable valeur de $\hat\beta_j$ (qui servi à la simulation) se trouve dans l'intervalle. Ce qui nous permettra après les 100 itérations d'obtenir une approximation du niveau empirique de cette approche.
+Nous souhaitons maintenant évaluer le niveau empirique de ces intervalles de confiance, sachant que le niveau de confiance attendu serait de 95%. Pour cela, nous itérons 100 fois le procédé suivant :
+
+- Pour chaque individu $i$, nous simulons une variable $y_i \sim \mathcal{P}(\lambda_i)$, avec $\lambda_i = \mathbb{E}[Y_i|X_i]$ l'intensité de l'individu $i$ estimé par le premier modèle construit.
+- Nous ajustons ensuite un modèle régularisé en utilisant les données simulées. 
+- Nous construisons de nouveaux intervalles de confiance pour les variables sélectionnées.
+- Nous vérifions si la véritable valeur de $\hat\beta_j$ (qui a servi à la simulation) se trouve dans ce nouvel intervalle. 
+
+À la fin des 100 itérations, nous obtiendrons donc une approximation du niveau empirique de cette approche.
 
 ```{r}
-# Nombre de répétition
+# Seuil 
+alpha <- .05
+
+# Nombre de répétitions
 nrep <- 100
 
-# Compteurs pour la couverture et le nombre d'intervales
+# Compteurs pour la couverture et le nombre d'intervalles
 compteur_couverture <- setNames(numeric(length(beta_true)), names(beta_true))
-nbr_intervales     <- setNames(numeric(length(beta_true)), names(beta_true))
+nb_intervalles <- setNames(numeric(length(beta_true)), names(beta_true))
 
-# On récupère les lambda_i pour les n individus
-lambda_hat <- predict(model_poiss, type = "response") # pred pour les données originale taille n
+# lambda_i estimés pour les données originales
+lambda_hat <- predict(model_poiss, type = "response")
 
 for(i in 1:nrep){
-  # On simule de nouvelles valeurs pour cnt suivant le modèle, avec 
-  #lambda_i = l'intensité pour l'obs i = lambda_hat[i]
+  # Nouveau y (nouveau "cnt")
   y_sim <- rpois(n, lambda = lambda_hat)
-  
-  # Ajustement d'un modèle LASSO avec lambda = lambda.1se sur l'ensemble des variables predictive
-  cv_i <- cv.glmnet(as.matrix(X),y_sim,family="poisson")
+  # Ajustement d'un LASSO avec lambda = lambda.1se sur l'ensemble des variables prédictives
+  cv_i <- cv.glmnet(as.matrix(X), y_sim, family = "poisson")
   lambda_i <- cv_i$lambda.1se
-  
   # Récupération du support correspondant
-  coef_i <- coef(cv_i, s=lambda_i)
-  index_col_select <- which(as.vector(coef_i[-1,1])!=0)
-  
-  # Calcul du modèle de poisson, récupération du beta.hat et des intervalles de confiance
-  X_act_i <- X[,index_col_select,drop=FALSE]
+  coef_i <- coef(cv_i, s = lambda_i)
+  index_col_select <- which(as.vector(coef_i[-1, 1]) != 0)
+  # Nouveau modèle de Poisson
+  X_act_i <- X[, index_col_select, drop = FALSE]
   model_poiss_i <- glm(y_sim ~ . , data = as.data.frame(X_act_i), family = poisson)
-  
-  # Récupération du beta_i et se_i pour les coefficients actifs
+  # Nouveaux intervalles de confiances
   beta_i <- numeric(ncol(X_act_i) + 1)
   names(beta_i) <- c("(Intercept)", colnames(X_act_i))
   beta_i[names(coef(model_poiss_i))] <- coef(model_poiss_i)
   se <- summary(model_poiss_i)$coefficients[, 2]
-  borne.inf_i <- beta_i - qnorm(0.975)*se/sqrt(n)
-  borne.sup_i <- beta_i + qnorm(0.975)*se/sqrt(n)
-  
-  # Évaluation si coefficient vrai est dans l'intervalle de confiance
-  for(name in names(borne.inf_i)){
+  borne_inf_i <- beta_i - qnorm(1-alpha/2)*se/sqrt(n)
+  borne_sup_i <- beta_i + qnorm(1-alpha/2)*se/sqrt(n)
+  # Variables originales sélectionnées ?
+  for(name in names(borne_inf_i)){
+    # Oui : on augmente le compteur d'intervalles
     if(name %in% names(beta_true)){
       beta_true_j <- beta_true[name]
-      inf <- borne.inf_i[name]
-      sup <- borne.sup_i[name]
-      nbr_intervales[name] <- nbr_intervales[name] + 1 # On augmente le compteur d'intervalle de 1
+      inf <- borne_inf_i[name]
+      sup <- borne_sup_i[name]
+      nb_intervalles[name] <- nb_intervalles[name] + 1
+      # Vrai valeur dans le nouvel intervalle ? 
       if (beta_true_j >= inf && beta_true_j <= sup) {
-        # Si la vraie valeur de beta est dans l'intervalle de l'itération i
-        # on augmente le compteur de couverture de 1.
+        # Oui : on augmente le compteur de couverture.
         compteur_couverture[name] <- compteur_couverture[name] + 1
       }
     }
   }
 }
 
-niveau_empirique <- compteur_couverture / nbr_intervales
+niveau_empirique <- compteur_couverture / nb_intervalles
 ```
 
 ```{r}
 kable(
-  t(compteur_couverture), caption = "Nombre de fois où le véritable coefficient
-  beta.hat.j s'est trouvé dans les intervalles de confiance", 
+  t(compteur_couverture), 
+  caption = "Nombre de fois où le vrai $\\hat\\beta_j$ était dans le nouvel intervalle de confiance", 
   format = "latex", booktabs = TRUE, escape = FALSE, align = "r"
 ) %>%
   kable_styling(latex_options = c("striped", "HOLD_position", "scale_down"), font_size = 9) %>%
@@ -303,7 +306,7 @@ kable(
 
 ```{r}
 kable(
-  t(nbr_intervales), caption = "Nombre d'occurence de la sélection des variables", 
+  t(nb_intervalles), caption = "Nombre de sélections des 'vraies' variables", 
   format = "latex", booktabs = TRUE, escape = FALSE, align = "r"
 ) %>%
   kable_styling(latex_options = c("striped", "HOLD_position", "scale_down"), font_size = 9) %>%
@@ -312,16 +315,16 @@ kable(
 
 ```{r}
 kable(
-  t(nbr_intervales), caption = "Niveau empirique moyen pour chaque variable", 
+  t(niveau_empirique), caption = "Niveau empirique moyen de chaque 'vraie' variable", 
   format = "latex", booktabs = TRUE, escape = FALSE, align = "r"
 ) %>%
   kable_styling(latex_options = c("striped", "HOLD_position", "scale_down"), font_size = 9) %>%
   row_spec(0, bold=TRUE)
 ```
 
-Nous obtenons un niveau de confiance moyen de `r round(mean(niveau_empirique)*100,2)`% contre les 100(1-alpha) = 95% qui seraient attendus. Cependant, cette différence peut-être expliquée par le fait que l'hypothèse que le modèle a été choisi sans voir les données est violée dans ce contexte. En effet, nous effectuons une inférence naïve en utilisant des données qui ont été déjà été utilisées afin d'effectuer la sélection des variables avec le LASSO. Cela donne alors lieu à des intervalles de confiance trop optimistes, trop resserrés comme nous l'avions remarqué précédemment et donc qui ne ne contiennent par la véritable valeur du coefficient : l'erreur est bien élevée que ce qui est attendu. 
+Nous obtenons un niveau de confiance moyen d'environ `r round(mean(niveau_empirique)*100,2)`%, contre $100 \cdot (1-\alpha) = 95\%$ attendu **(Tab. 8)**. Cependant, cette différence peut s'expliquer : l'hypothèse d'un modèle choisi sans voir les données est violée dans ce contexte. En effet, nous effectuons une inférence naïve sur des données déjà utilisées afin d'effectuer la sélection des variables avec le LASSO. Cela entraîne des intervalles de confiance trop optimistes (trop resserrés, comme nous l'avions remarqué précédemment) dans lesquels les "vraies" coefficients ont peu de chance de se trouver. 
 
-Ce résultat est un bon exemple des défis spécifiques à l'inférence après la sélection de variables : puisque les données ont déjà été utilisées pour la sélection de variables, il n'est plus possible des les utiliser naïvement pour l'inférence sur les coefficients. Il est donc nécessaire d'opter pour une autre approche qui prend en compte cette problématique comme le data-splitting qui consiste à séparer le jeu de données en 2 parties (une pour la sélection des variables et une pour l'inférence) mais qui nécessite d'avoir suffisamment de données ou les méthodes du package selectiveInference que nous avons vu précédemment.
+Ce résultat est un bon exemple des défis spécifiques à l'inférence post-sélection de variables : puisque les données ont déjà été utilisées pour la sélection de variables, il n'est plus possible des les utiliser naïvement pour l'inférence sur les coefficients. Il est donc nécessaire d'opter pour une autre approche qui prend en compte cette problématique, comme par exemple le data-splitting (séparer le jeu de données en 2, avec une partie pour la sélection de variables et l'autre pour l'inférence) ou les méthodes du package `selectiveInference` vu précédemment.
 
 
 
