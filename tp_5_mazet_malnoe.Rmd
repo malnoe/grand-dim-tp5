@@ -19,6 +19,9 @@ geometry: margin = 1.5 cm
 \
 \
 
+
+\newpage
+
 ```{r, message=FALSE, warning=FALSE}
 # Packages statistiques
 library(glmnet)
@@ -31,10 +34,6 @@ library(tidyverse)
 library(knitr)
 library(kableExtra)
 ```
-
-
-
-\newpage
 
 
 # *Préparation des données.*
@@ -81,7 +80,7 @@ kable(
   row_spec(0, bold=TRUE)
 ```
 
-D'après les résumés statistiques, aucune variable ne semble avoir de valeur aberrante qui serait à exclure **(Tab. 1, Tab. 2)**.
+D'après les résumés statistiques, aucune variable ne semble avoir de valeur aberrante qui serait à exclure **(Tab. 1, Tab. 2)**.\
 
 Dans le cadre de notre étude, nous souhaitons prédire la variable `cnt`, qui compte le nombre d'emprunts de vélos réalisés dans une journée et est donc une variable de comptage. Nous pouvons donc bien appliquer une régression de Poisson afin de la modéliser.
 \
@@ -89,7 +88,8 @@ Dans le cadre de notre étude, nous souhaitons prédire la variable `cnt`, qui c
 
 # *Estimation et stabilité de l'estimateur.*
 
-Nous souhaitons ajuster un modèle de régression de Poisson tout en appliquant une régularisation LASSO afin d'effectuer une sélection des variables prédictives. Pour cela, nous utilisons le package `glmnet` en précisant l'argument `family = "poisson"` dans l'appel des fonctions. Nous conservons arbitrairement la valeur de `lambda.1se` obtenue par validation croisée comme meilleure valeur du paramètre de régularisation.
+Nous souhaitons ajuster un modèle de régression de Poisson tout en appliquant une régularisation LASSO afin d'effectuer une sélection des variables prédictives. Pour cela, nous utilisons le package `glmnet` en précisant l'argument `family = "poisson"` dans l'appel des fonctions. Nous choisissons de conserver la valeur de `lambda.1se` obtenue par validation croisée comme meilleure valeur du paramètre de régularisation.\
+
 ```{r, cache=TRUE}
 # Format matriciel pour glmnet
 X <- as.matrix(data[colnames(data) != "cnt"])
@@ -105,7 +105,7 @@ mod_lasso <- glmnet(x = X, y = y, alpha = 1, lambda = lambda_1se, family = "pois
 
 Le paramètre de régularisation retenu est `lambda.1se` = `r round(lambda_1se, 3)`, et les variables sélectionnées via ce modèle entraîné sur l'ensemble des données de bases sont : `r paste(colnames(data)[which(coef(mod_lasso) != 0)[-1] - 1], collapse = ", ")`.
 
-Nous souhaitons maintenant analyser la stabilité de la sélection des variables. Pour cela, nous effectuons un bootstrap sur les données avec 100 itérations. Pour chaque itération, nous regardons quelles variables ont été sélectionnées lorsque l'on choisit comme paramètre de régularisation le `lambda.1se` obtenu par validation croisée sur les nouvelles données. Nous obtenons finalement une matrice nous indiquant, pour chaque itération, quelles variables ont été sélectionnées et ainsi estimer la fréquence de sélection de chaque variable.
+Nous souhaitons maintenant analyser la stabilité de la sélection des variables. Pour cela, nous effectuons un bootstrap sur les données avec 100 itérations. Pour chaque itération, nous regardons quelles variables ont été sélectionnées lorsque l'on choisit comme paramètre de régularisation le `lambda.1se` obtenu par validation croisée sur les nouvelles données. Nous obtenons finalement une matrice nous indiquant, pour chaque itération, quelles variables ont été sélectionnées et ainsi estimer la fréquence de sélection de chaque variable lorsque l'on choisi `lambda.1se` comme paramètre de régularistation à chaque fois.
 ```{r, cache=TRUE}
 set.seed(2) # Reproductibilité
 
@@ -130,7 +130,7 @@ for (i in 1:n_it) {
 }
 ```
 
-```{r hm1, fig.align="center", fig.width=6, fig.height=3.5, fig.cap="Stabilité à lambda.1se au fil des itérations"}
+```{r hm1, fig.align="center", fig.width=6, fig.height=3.5, fig.cap="Stabilité à lambda.1se au fil des itérations",cache=TRUE}
 # Stabilité des variables
 ### Dataset de résultat au format long
 df_lasso <- t(mat_vars) %>%
@@ -165,9 +165,7 @@ kable(
   row_spec(0, bold=TRUE)
 ```
 
-La figure précédente **(Fig. \@ref(fig:hm1))** présente les variables sélectionnées à chaque itération, avec 1 = "la variable a été sélectionnée" et 0 sinon (la légende de couleur devrait être discrète (0 et 1) mais ggplot n'accepte pas ce format sur une heatmap).
-D'une part, 5 variables semblent stables en termes de sélection : les variables `season`, `yr`, `weathersit` et `atemp` sont systématiquement sélectionnées, et la variable `mnth` ne l'est jamais.
-D'autre part, les autres variables (`holiday`, `weekday`, `workingday`,`temp`, `hum` et `windspeed`) sont sélectionnées de manière instable (entre 5% et 95% du temps) **(Tab. 3)**. 
+La figure précédente **(Fig. \@ref(fig:hm1))** présente les variables sélectionnées à chaque itération, avec 1 = "la variable a été sélectionnée" et 0 sinon (la légende de couleur devrait être discrète (0 et 1) mais ggplot n'accepte pas ce format sur une heatmap). A partir de cette figure et de la table **(Tab. 3)**, nous observons différents niveaux de sélection. D'une part, 5 variables semblent stables en termes de sélection : les variables `season`, `yr`, `weathersit` et `atemp` sont systématiquement sélectionnées, et la variable `mnth` ne l'est jamais. D'autre part, les autres variables (`holiday`, `weekday`, `workingday`,`temp`, `hum` et `windspeed`) sont sélectionnées de manière instable (entre 5% et 95% du temps). 
 
 La méthode LASSO, en choisissant `lambda.1se` comme paramètre de régularisation, présente donc une instabilité sur la sélection des variables. Cette instabilité est potentiellement due à la présence de multicolinéarité entre certaines variables.
 \
@@ -182,8 +180,9 @@ $$
 \hat{IC}^j_{\alpha} = \left[\hat\beta_j - \frac{q_{1-\frac{\alpha}{2}}\hat\sigma_j}{\sqrt{n}} ; \hat\beta_j + \frac{q_{1-\frac{\alpha}{2}}\hat\sigma_j}{\sqrt{n}}\right]
 $$
 
-Les coefficients non nuls sélectionnés par LASSO sur les données originales avec lambda = `lambda.1se` concernent les variables `r paste(colnames(data)[which(coef(mod_lasso) != 0)[-1] - 1], collapse = ", ")`. Nous construisons donc le modèle de régression de Poisson restreint à ces variables.
-```{r}
+Les coefficients non nuls sélectionnés par LASSO sur les données originales avec lambda = `lambda.1se` concernent les variables `r paste(colnames(data)[which(coef(mod_lasso) != 0)[-1] - 1], collapse = ", ")`. Nous construisons donc le modèle de régression de Poisson restreint à ces variables.\
+
+```{r, cache=TRUE}
 # Données avec uniquement les variables sélectionnées
 y <- data$cnt
 X_bis <- data[, -c(3,6,10,12)]
@@ -202,7 +201,7 @@ kable(
 ```
 
 Nous pouvons alors construire les intervalles de confiance pour tous les $\hat\beta_j$ au niveau $\alpha=0.05$ :
-```{r}
+```{r, cache=TRUE}
 # Seuil alpha
 alpha <- .05
 # Coefficients beta et mise en forme
@@ -235,15 +234,15 @@ Nous constatons que les intervalles de confiances sont tous très resserrés aut
 Nous souhaitons maintenant évaluer le niveau empirique de ces intervalles de confiance, sachant que le niveau de confiance attendu serait de 95%. Pour cela, nous itérons 100 fois le procédé suivant :
 
 - Pour chaque individu $i$, nous simulons une variable $y_i \sim \mathcal{P}(\lambda_i)$, avec $\lambda_i = \mathbb{E}[Y_i|X_i]$ l'intensité de l'individu $i$ estimé par le premier modèle construit.
-- Nous ajustons ensuite un modèle régularisé en utilisant les données simulées. 
+- Nous ajustons ensuite un modèle régularisé en utilisant les données simulées, nous récupérons le $\hat S$ correspondant aux variables sélectionnées pour ces données simulées et recalculons l'estimateur de maimum de vraisemblance restraint à $\hat S$ pour les données simulées.
 - Nous construisons de nouveaux intervalles de confiance pour les variables sélectionnées.
-- Nous vérifions si la véritable valeur de $\hat\beta_j$ (qui a servi à la simulation) se trouve dans ce nouvel intervalle. 
+- Nous vérifions si la véritable valeur de $\hat\beta_j$ (qui a servi à la simulation) se trouve dans ce nouvel intervalle de confiance.
 
-À la fin des 100 itérations, nous obtiendrons donc une approximation du niveau empirique de cette approche.
+À la fin des 100 itérations, nous obtiendrons donc une approximation du niveau empirique de cette approche.\
 
-```{r}
+```{r,cache=TRUE}
 # Seuil 
-alpha <- .05
+alpha <- 0.05
 
 # Nombre de répétitions
 nrep <- 100
@@ -252,11 +251,11 @@ nrep <- 100
 compteur_couverture <- setNames(numeric(length(beta_true)), names(beta_true))
 nb_intervalles <- setNames(numeric(length(beta_true)), names(beta_true))
 
-# lambda_i estimés pour les données originales
+# Intensité estimés pour les données originales
 lambda_hat <- predict(model_poiss, type = "response")
 
 for(i in 1:nrep){
-  # Nouveau y (nouveau "cnt")
+  # Nouveau y (nouveau "cnt") simulé à partir de beta
   y_sim <- rpois(n, lambda = lambda_hat)
   # Ajustement d'un LASSO avec lambda = lambda.1se sur l'ensemble des variables prédictives
   cv_i <- cv.glmnet(as.matrix(X), y_sim, family = "poisson")
@@ -266,7 +265,7 @@ for(i in 1:nrep){
   index_col_select <- which(as.vector(coef_i[-1, 1]) != 0)
   # Nouveau modèle de Poisson
   X_act_i <- X[, index_col_select, drop = FALSE]
-  model_poiss_i <- glm(y_sim ~ . , data = as.data.frame(X_act_i), family = poisson)
+  model_poiss_i <- glm(y_sim ~ . , data = as.data.frame(X_act_i), family = "poisson")
   # Nouveaux intervalles de confiances
   beta_i <- numeric(ncol(X_act_i) + 1)
   names(beta_i) <- c("(Intercept)", colnames(X_act_i))
@@ -306,7 +305,7 @@ kable(
 
 ```{r}
 kable(
-  t(nb_intervalles), caption = "Nombre de sélections des 'vraies' variables", 
+  t(nb_intervalles), caption = "Nombre de sélections des variables", 
   format = "latex", booktabs = TRUE, escape = FALSE, align = "r"
 ) %>%
   kable_styling(latex_options = c("striped", "HOLD_position", "scale_down"), font_size = 9) %>%
@@ -315,7 +314,7 @@ kable(
 
 ```{r}
 kable(
-  t(niveau_empirique), caption = "Niveau empirique moyen de chaque 'vraie' variable", 
+  t(niveau_empirique), caption = "Niveau empirique moyen de chaque variable", 
   format = "latex", booktabs = TRUE, escape = FALSE, align = "r"
 ) %>%
   kable_styling(latex_options = c("striped", "HOLD_position", "scale_down"), font_size = 9) %>%
